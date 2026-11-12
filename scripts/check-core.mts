@@ -22,6 +22,8 @@ try {
   assert.notEqual(token, secondToken);
   assert.equal(timingSafeEqualHex(hashToken(token), hashToken(token)), true);
   assert.equal(verifyDeskToken(token)?.creatorId, creatorId);
+  assert.equal(verifyDeskToken("x".repeat(44)), null);
+  assert.equal(verifyDeskToken(""), null);
   assert.equal(verifyDeskToken("x".repeat(43)), null);
   assert.equal(revokeDeskToken(token), true);
   assert.equal(verifyDeskToken(token), null);
@@ -55,9 +57,11 @@ try {
   assert(goodUrl.ok);
   assert.equal(goodUrl.value, "https://example.com");
   assert.equal(validateDeliverableUrl("http://example.com").ok, false);
+  assert.equal(validateDeliverableUrl("https://user:password@example.com").ok, false);
   const goodDescription = validateDescription("  okay  ");
   assert(goodDescription.ok);
   assert.equal(goodDescription.value, "okay");
+  assert.equal(validateDescription("   ").ok, false);
   assert.equal(validateDescription("x".repeat(501)).ok, false);
   assert.equal(validateClientName("x".repeat(101)).ok, false);
 

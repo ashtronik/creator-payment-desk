@@ -47,6 +47,9 @@ export function validateDeliverableUrl(value: unknown): ValidationResult<string>
     if (url.protocol !== "https:") {
       return { ok: false, error: "deliverable url must use https" };
     }
+    if (url.username || url.password) {
+      return { ok: false, error: "deliverable url must not contain credentials" };
+    }
   } catch {
     return { ok: false, error: "deliverable url must be a valid https URL" };
   }
@@ -55,7 +58,12 @@ export function validateDeliverableUrl(value: unknown): ValidationResult<string>
 }
 
 export function validateDescription(value: unknown): ValidationResult<string> {
-  return stringResult(value, "description", 500);
+  const result = stringResult(value, "description", 500);
+  if (!result.ok) return result;
+  if (result.value.length === 0) {
+    return { ok: false, error: "description must not be empty" };
+  }
+  return result;
 }
 
 export function validateClientName(value: unknown): ValidationResult<string> {

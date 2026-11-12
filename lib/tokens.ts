@@ -9,7 +9,8 @@ export function hashToken(token: string): string {
 }
 
 export function timingSafeEqualHex(left: string, right: string): boolean {
-  if (left.length !== right.length) {
+  const hexPattern = /^[0-9a-f]+$/;
+  if (!hexPattern.test(left) || !hexPattern.test(right) || left.length !== right.length) {
     return false;
   }
 

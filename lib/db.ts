@@ -141,18 +141,18 @@ export function issueDeskToken(creatorId: number): string {
 }
 
 export function verifyDeskToken(token: string): { creatorId: number } | null {
-  if (typeof token !== "string" || token.length === 0) return null;
+  if (typeof token !== "string" || token.length !== 43) return null;
 
-  const candidates = database
-    .prepare("SELECT creator_id, token_hash FROM desk_tokens WHERE revoked_at IS NULL")
-    .all();
-  for (const candidate of candidates) {
-    if (timingSafeEqualHex(String(candidate.token_hash), hashToken(token))) {
-      database.prepare("UPDATE desk_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE token_hash = ?")
-        .run(candidate.token_hash);
-      return { creatorId: Number(candidate.creator_id) };
-    }
+  const tokenHash = hashToken(token);
+  const candidate = database
+    .prepare("SELECT creator_id, token_hash FROM desk_tokens WHERE token_hash = ? AND revoked_at IS NULL")
+    .get(tokenHash);
+  if (candidate && timingSafeEqualHex(String(candidate.token_hash), tokenHash)) {
+    database.prepare("UPDATE desk_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE token_hash = ?")
+      .run(tokenHash);
+    return { creatorId: Number(candidate.creator_id) };
   }
+
   return null;
 }
 
