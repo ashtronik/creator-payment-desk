@@ -1,4 +1,5 @@
 import { listInvoicesForCreator, verifyDeskToken } from "@/lib/db";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 function escapeCsvCell(value: string): string {
   const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
@@ -14,7 +15,11 @@ function formatUsd(cents: number): string {
 export async function GET(request: Request) {
   const token = request.headers.get("x-desk-token");
   const access = token ? verifyDeskToken(token) : null;
-  if (!access) return Response.json({ error: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  if (!access) {
+    const attempt = rateLimit(`desk-token-failure:${clientIp(request)}`, 20, 10 * 60_000);
+    if (!attempt.ok) return Response.json({ error: "RATE_LIMITED" }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(attempt.retryAfterSeconds) } });
+    return Response.json({ error: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  }
   const header = ["invoice_id", "created_at", "description", "client_name", "amount_usd", "status", "paid_at", "tx_hash"];
   const rows = listInvoicesForCreator(access.creatorId).map((invoice) => [
     invoice.id, invoice.created_at, invoice.description, invoice.client_name, formatUsd(invoice.amount_cents), invoice.status, invoice.paid_at ?? "", invoice.tx_hash ?? "",

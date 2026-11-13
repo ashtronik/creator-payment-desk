@@ -1,9 +1,16 @@
 import { InvoiceNotFoundError, InvoicePaidError, OneClickProviderError, PaymentInputError, createQuoteForInvoice } from "@/lib/payment-service";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 const MAX_BODY_BYTES = 5 * 1024;
 const noStore = { "Cache-Control": "no-store" };
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const ipLimit = rateLimit(`invoice-quote-ip:${clientIp(request)}`, 15, 60 * 60_000);
+  const invoiceLimit = rateLimit(`invoice-quote-id:${id}`, 3, 60 * 60_000);
+  if (!ipLimit.ok || !invoiceLimit.ok) {
+    return Response.json({ error: "RATE_LIMITED" }, { status: 429, headers: { ...noStore, "Retry-After": String(Math.max(ipLimit.retryAfterSeconds, invoiceLimit.retryAfterSeconds)) } });
+  }
   const contentLength = request.headers.get("content-length");
   if (contentLength && Number(contentLength) > MAX_BODY_BYTES) return Response.json({ error: "INVALID_INPUT" }, { status: 400, headers: noStore });
   let body: unknown;
@@ -14,7 +21,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   } catch { return Response.json({ error: "INVALID_INPUT" }, { status: 400, headers: noStore }); }
   if (!body || typeof body !== "object" || Array.isArray(body)) return Response.json({ error: "INVALID_INPUT" }, { status: 400, headers: noStore });
   try {
-    const { id } = await context.params;
     const input = body as Record<string, unknown>;
     const result = await createQuoteForInvoice(id, input.originAsset, input.refundTo);
     return Response.json(result, { headers: noStore });

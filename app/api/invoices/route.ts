@@ -1,13 +1,29 @@
 import { verifyDeskToken } from "@/lib/db";
 import { createInvoiceForCreator, createInvoiceForWallet } from "@/lib/invoice-service";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { hashToken } from "@/lib/tokens";
 
 const MAX_BODY_BYTES = 10 * 1024;
+const hour = 60 * 60_000;
+
+function rateLimited(retryAfterSeconds: number) {
+  return Response.json({ error: "RATE_LIMITED" }, { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } });
+}
 
 export async function POST(request: Request) {
   const hasDeskToken = request.headers.has("x-desk-token");
   const deskToken = request.headers.get("x-desk-token");
   const deskAccess = hasDeskToken && deskToken ? verifyDeskToken(deskToken) : null;
-  if (hasDeskToken && !deskAccess) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (hasDeskToken && !deskAccess) {
+    const attempt = rateLimit(`desk-token-failure:${clientIp(request)}`, 20, 10 * 60_000);
+    if (!attempt.ok) return rateLimited(attempt.retryAfterSeconds);
+    return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+  }
+
+  const limit = deskAccess && deskToken
+    ? rateLimit(`invoice-create-token:${hashToken(deskToken)}`, 60, hour)
+    : rateLimit(`invoice-create-ip:${clientIp(request)}`, 10, hour);
+  if (!limit.ok) return rateLimited(limit.retryAfterSeconds);
 
   const contentLength = request.headers.get("content-length");
   if (contentLength && Number(contentLength) > MAX_BODY_BYTES) {

@@ -8,6 +8,7 @@ process.env.DB_PATH = join(tempDirectory, "check.db");
 
 const { countActiveDeskTokens, createCreator, createInvoice, findCreatorByAddress, getCreatorDesk, getInvoicePublic, issueDeskToken, listInvoicesForCreator, revokeDeskToken, revokeOtherDeskTokens, verifyDeskToken } = await import("../lib/db");
 const { hashToken, timingSafeEqualHex } = await import("../lib/tokens");
+const { rateLimit } = await import("../lib/rate-limit");
 const { validateAmountCents, validateClientName, validateDeliverableUrl, validateDescription, validateNearAddress } = await import("../lib/validate");
 const { createInvoiceForCreator, createInvoiceForWallet } = await import("../lib/invoice-service");
 const { createQuoteForInvoice, refreshInvoiceStatus, PaymentInputError } = await import("../lib/payment-service");
@@ -16,6 +17,27 @@ const { POST: createInvoiceRoute } = await import("../app/api/invoices/route");
 const { escapeCsvCell } = await import("../app/api/desk/export/route");
 
 try {
+  const limiterStart = 1_000_000;
+  assert.equal(rateLimit("limiter-allow", 2, 1_000, limiterStart).ok, true);
+  assert.equal(rateLimit("limiter-allow", 2, 1_000, limiterStart + 1).ok, true);
+  const blockedLimit = rateLimit("limiter-allow", 2, 1_000, limiterStart + 2);
+  assert.equal(blockedLimit.ok, false);
+  assert.equal(blockedLimit.retryAfterSeconds, 1);
+  assert.equal(rateLimit("limiter-allow", 2, 1_000, limiterStart + 1_000).ok, true);
+
+  const capStart = 2_000_000;
+  assert.equal(rateLimit("limiter-cap-oldest", 1, 60_000, capStart).ok, true);
+  for (let index = 0; index < 9_999; index += 1) {
+    assert.equal(rateLimit(`limiter-cap-${index}`, 1, 60_000, capStart).ok, true);
+  }
+  assert.equal(rateLimit("limiter-cap-overflow", 1, 60_000, capStart).ok, true);
+  assert.equal(rateLimit("limiter-cap-oldest", 1, 60_000, capStart).ok, true);
+
+  process.env.RATE_LIMIT_DISABLED = "true";
+  assert.equal(rateLimit("limiter-disabled", 1, 60_000, limiterStart).ok, true);
+  assert.equal(rateLimit("limiter-disabled", 1, 60_000, limiterStart).ok, true);
+  delete process.env.RATE_LIMIT_DISABLED;
+
   const creatorId = createCreator("alice.near");
   const otherCreatorId = createCreator("bob.near");
   assert.equal(findCreatorByAddress(" alice.near ")?.id, creatorId);
