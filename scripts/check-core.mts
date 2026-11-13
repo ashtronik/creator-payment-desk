@@ -10,6 +10,7 @@ const { createCreator, createInvoice, findCreatorByAddress, getInvoicePublic, is
 const { hashToken, timingSafeEqualHex } = await import("../lib/tokens");
 const { validateAmountCents, validateClientName, validateDeliverableUrl, validateDescription, validateNearAddress } = await import("../lib/validate");
 const { createInvoiceForWallet } = await import("../lib/invoice-service");
+const { createQuoteForInvoice, refreshInvoiceStatus, PaymentInputError } = await import("../lib/payment-service");
 
 try {
   const creatorId = createCreator("alice.near");
@@ -96,6 +97,72 @@ try {
     deliverableUrl: "http://example.com",
   });
   assert.equal(invalidWalletInvoice.kind, "invalid");
+
+  process.env.DEMO_MODE = "false";
+  let calls = 0;
+  let quoteBody: Record<string, unknown> | null = null;
+  let nextProviderStatus = "PENDING_DEPOSIT";
+  const fakeFetch = async (input: string | URL | Request, init?: RequestInit) => {
+    calls += 1;
+    const url = String(input);
+    if (url.endsWith("/v0/tokens")) return Response.json([
+      { assetId: "usdc.near", decimals: 6, blockchain: "near", symbol: "USDC" },
+      { assetId: "eth.usdc", decimals: 6, blockchain: "eth", symbol: "USDC" },
+    ]);
+    if (url.endsWith("/v0/quote")) {
+      quoteBody = JSON.parse(String(init?.body));
+      return Response.json({ quote: { depositAddress: "deposit-1", amountIn: "50000000", amountInFormatted: "50 USDC", amountOut: "49990000", deadline: new Date(Date.now() + 60 * 60_000).toISOString(), timeEstimate: 12 }, signature: "signature" });
+    }
+    return Response.json({ status: nextProviderStatus, swapDetails: { destinationChainTxHashes: [{ hash: "tx-1", explorerUrl: "https://explorer.example/tx-1" }] } });
+  };
+
+  const paymentInvoice = createInvoice({
+    creatorId,
+    amountCents: 4_999,
+    description: "Payment test",
+    deliverableUrl: "https://example.com/payment-test",
+    clientName: "Payment client",
+  });
+  const quoted = await createQuoteForInvoice(paymentInvoice.id, "eth.usdc", "0xabc", { fetchImpl: fakeFetch, now: Date.now() });
+  assert.equal(quoted.payment?.depositAddress, "deposit-1");
+  assert(quoteBody);
+  const capturedQuoteBody = quoteBody as Record<string, unknown>;
+  assert.equal(capturedQuoteBody.amount, "49990000");
+  assert.equal(capturedQuoteBody.recipient, "alice.near");
+  assert.equal(capturedQuoteBody.swapType, "EXACT_OUTPUT");
+  const callsAfterQuote = calls;
+  await createQuoteForInvoice(paymentInvoice.id, "eth.usdc", "0xabc", { fetchImpl: fakeFetch, now: Date.now() });
+  assert.equal(calls, callsAfterQuote);
+  await assert.rejects(() => createQuoteForInvoice(paymentInvoice.id, "not-a-token", "0xabc", { fetchImpl: fakeFetch }), PaymentInputError);
+
+  const statusCases: Array<[string, string]> = [
+    ["PENDING_DEPOSIT", "awaiting_deposit"], ["KNOWN_DEPOSIT_TX", "processing"], ["PROCESSING", "processing"],
+    ["SUCCESS", "paid"], ["INCOMPLETE_DEPOSIT", "incomplete"], ["REFUNDED", "refunded"], ["FAILED", "failed"],
+  ];
+  for (const [providerStatus, expected] of statusCases) {
+    const statusInvoice = createInvoice({ creatorId, amountCents: 1_000, description: `Status ${providerStatus}`, deliverableUrl: `https://example.com/${providerStatus}`, clientName: "Client" });
+    const base = Date.now();
+    await createQuoteForInvoice(statusInvoice.id, "eth.usdc", "0xabc", { fetchImpl: fakeFetch, now: base });
+    nextProviderStatus = providerStatus;
+    const state = await refreshInvoiceStatus(statusInvoice.id, { fetchImpl: fakeFetch, now: base + 4_000 });
+    assert.equal(state.status, expected);
+    if (providerStatus === "SUCCESS") {
+      nextProviderStatus = "FAILED";
+      const paidAgain = await refreshInvoiceStatus(statusInvoice.id, { fetchImpl: fakeFetch, now: base + 8_000 });
+      assert.equal(paidAgain.status, "paid");
+    }
+  }
+
+  process.env.DEMO_MODE = "true";
+  let demoCalls = 0;
+  const demoFetch = async () => { demoCalls += 1; return Response.json({}); };
+  const demoInvoice = createInvoice({ creatorId, amountCents: 1_000, description: "Demo payment", deliverableUrl: "https://example.com/demo", clientName: "Demo" });
+  const demoStart = Date.now();
+  await createQuoteForInvoice(demoInvoice.id, "nep141:usdc.demo.near", "demo-refund", { fetchImpl: demoFetch as typeof fetch, now: demoStart });
+  assert.equal((await refreshInvoiceStatus(demoInvoice.id, { fetchImpl: demoFetch as typeof fetch, now: demoStart + 1_000 })).status, "awaiting_deposit");
+  assert.equal((await refreshInvoiceStatus(demoInvoice.id, { fetchImpl: demoFetch as typeof fetch, now: demoStart + 6_000 })).status, "processing");
+  assert.equal((await refreshInvoiceStatus(demoInvoice.id, { fetchImpl: demoFetch as typeof fetch, now: demoStart + 11_000 })).status, "paid");
+  assert.equal(demoCalls, 0);
 
   console.log("Core checks passed");
 } finally {

@@ -43,6 +43,13 @@ export type PublicInvoice = {
   paid_at: string | null;
 };
 
+export type InvoicePaymentState = PublicInvoice & {
+  recipient_address: string;
+  quote_json: string | null;
+  deposit_memo: string | null;
+  refund_to: string | null;
+};
+
 export type CreateInvoiceInput = {
   creatorId: number;
   amountCents: number;
@@ -99,6 +106,17 @@ export function getDatabase(): SqliteDatabase {
     );
     CREATE INDEX IF NOT EXISTS invoices_creator_id_idx ON invoices(creator_id);
   `);
+  // SQLite has no ADD COLUMN IF NOT EXISTS. Inspect first so existing local
+  // databases and freshly-created databases follow the same migration path.
+  const columns = openedDatabase.prepare("PRAGMA table_info(invoices)").all()
+    .map((row) => String(row.name));
+  for (const [name, definition] of [
+    ["quote_json", "TEXT"],
+    ["deposit_memo", "TEXT"],
+    ["refund_to", "TEXT"],
+  ] as const) {
+    if (!columns.includes(name)) openedDatabase.exec(`ALTER TABLE invoices ADD COLUMN ${name} ${definition}`);
+  }
   database = openedDatabase;
   return database;
 }
@@ -279,5 +297,57 @@ export function getInvoicePaymentDetails(id: string): (PublicInvoice & { recipie
     WHERE invoices.id = ?
   `).get(id);
   return row ? { ...rowToPublicInvoice(row), recipient_address: String(row.recipient_address) } : null;
+}
+
+export function getInvoicePaymentState(id: string): InvoicePaymentState | null {
+  const database = getDatabase();
+  const row = database.prepare(`
+    SELECT invoices.id, invoices.amount_cents, invoices.description, invoices.deliverable_url,
+      invoices.client_name, invoices.status, invoices.deposit_address, invoices.origin_asset,
+      invoices.quote_expires_at, invoices.tx_hash, invoices.created_at, invoices.paid_at,
+      invoices.quote_json, invoices.deposit_memo, invoices.refund_to,
+      creators.near_address AS recipient_address
+    FROM invoices INNER JOIN creators ON creators.id = invoices.creator_id
+    WHERE invoices.id = ?
+  `).get(id);
+  if (!row) return null;
+  return {
+    ...rowToPublicInvoice(row),
+    recipient_address: String(row.recipient_address),
+    quote_json: row.quote_json == null ? null : String(row.quote_json),
+    deposit_memo: row.deposit_memo == null ? null : String(row.deposit_memo),
+    refund_to: row.refund_to == null ? null : String(row.refund_to),
+  };
+}
+
+export function saveInvoiceQuote(id: string, input: {
+  quoteJson: string;
+  depositAddress: string;
+  depositMemo: string | null;
+  originAsset: string;
+  refundTo: string;
+  quoteExpiresAt: string;
+}): void {
+  getDatabase().prepare(`
+    UPDATE invoices SET quote_json = ?, deposit_address = ?, deposit_memo = ?, origin_asset = ?,
+      refund_to = ?, quote_expires_at = ?, status = 'awaiting_deposit'
+    WHERE id = ? AND status != 'paid'
+  `).run(input.quoteJson, input.depositAddress, input.depositMemo, input.originAsset, input.refundTo, input.quoteExpiresAt, id);
+}
+
+export function updateInvoicePaymentStatus(id: string, status: string, txHash: string | null): InvoicePaymentState {
+  const database = getDatabase();
+  if (status === "paid") {
+    database.prepare(`
+      UPDATE invoices SET status = 'paid', tx_hash = COALESCE(?, tx_hash),
+        paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP)
+      WHERE id = ? AND status != 'paid'
+    `).run(txHash, id);
+  } else {
+    database.prepare("UPDATE invoices SET status = ? WHERE id = ? AND status != 'paid'").run(status, id);
+  }
+  const invoice = getInvoicePaymentState(id);
+  if (!invoice) throw new Error("Invoice not found");
+  return invoice;
 }
 
