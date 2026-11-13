@@ -9,6 +9,7 @@ process.env.DB_PATH = join(tempDirectory, "check.db");
 const { createCreator, createInvoice, findCreatorByAddress, getInvoicePublic, issueDeskToken, listInvoicesForCreator, revokeDeskToken, verifyDeskToken } = await import("../lib/db");
 const { hashToken, timingSafeEqualHex } = await import("../lib/tokens");
 const { validateAmountCents, validateClientName, validateDeliverableUrl, validateDescription, validateNearAddress } = await import("../lib/validate");
+const { createInvoiceForWallet } = await import("../lib/invoice-service");
 
 try {
   const creatorId = createCreator("alice.near");
@@ -64,6 +65,37 @@ try {
   assert.equal(validateDescription("   ").ok, false);
   assert.equal(validateDescription("x".repeat(501)).ok, false);
   assert.equal(validateClientName("x".repeat(101)).ok, false);
+
+  const newWalletInvoice = createInvoiceForWallet({
+    wallet: "new-creator.near",
+    amountCents: 2_500,
+    description: "Initial project delivery",
+    deliverableUrl: "https://example.com/initial-delivery",
+  });
+  assert.equal(newWalletInvoice.kind, "created");
+  assert.equal(newWalletInvoice.deskToken.length, 43);
+  const newCreator = findCreatorByAddress("new-creator.near");
+  assert(newCreator);
+  assert.equal(verifyDeskToken(newWalletInvoice.deskToken)?.creatorId, newCreator.id);
+  assert.equal(listInvoicesForCreator(newCreator.id).length, 1);
+  assert.equal(listInvoicesForCreator(newCreator.id)[0]?.id, newWalletInvoice.invoiceId);
+
+  const duplicateWalletInvoice = createInvoiceForWallet({
+    wallet: "new-creator.near",
+    amountCents: 2_500,
+    description: "Should not be created",
+    deliverableUrl: "https://example.com/should-not-exist",
+  });
+  assert.equal(duplicateWalletInvoice.kind, "desk_exists");
+  assert.equal(listInvoicesForCreator(newCreator.id).length, 1);
+
+  const invalidWalletInvoice = createInvoiceForWallet({
+    wallet: "invalid wallet",
+    amountCents: 1,
+    description: "",
+    deliverableUrl: "http://example.com",
+  });
+  assert.equal(invalidWalletInvoice.kind, "invalid");
 
   console.log("Core checks passed");
 } finally {

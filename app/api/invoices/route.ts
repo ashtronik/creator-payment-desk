@@ -1,0 +1,47 @@
+import { createInvoiceForWallet } from "@/lib/invoice-service";
+
+const MAX_BODY_BYTES = 10 * 1024;
+
+export async function POST(request: Request) {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && Number(contentLength) > MAX_BODY_BYTES) {
+    return Response.json({ errors: { body: "Request body must be 10 KB or smaller" } }, { status: 400 });
+  }
+
+  let body: unknown;
+  try {
+    const text = await request.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) {
+      return Response.json({ errors: { body: "Request body must be 10 KB or smaller" } }, { status: 400 });
+    }
+    body = JSON.parse(text);
+  } catch {
+    return Response.json({ errors: { body: "Invalid JSON body" } }, { status: 400 });
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return Response.json({ errors: { body: "JSON body must be an object" } }, { status: 400 });
+  }
+
+  try {
+    const input = body as Record<string, unknown>;
+    const result = createInvoiceForWallet({
+      wallet: input.wallet,
+      amountCents: input.amountCents,
+      description: input.description,
+      deliverableUrl: input.deliverableUrl,
+      clientName: input.clientName,
+    });
+    if (result.kind === "invalid") return Response.json({ errors: result.errors }, { status: 400 });
+    if (result.kind === "desk_exists") return Response.json({ error: "DESK_EXISTS" }, { status: 409 });
+
+    const origin = new URL(request.url).origin;
+    return Response.json({
+      invoiceId: result.invoiceId,
+      payUrl: `${origin}/pay/${encodeURIComponent(result.invoiceId)}`,
+      deskUrl: `${origin}/desk/${encodeURIComponent(result.deskToken)}`,
+      deskToken: result.deskToken,
+    }, { status: 201, headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return Response.json({ error: "Unable to create invoice" }, { status: 500 });
+  }
+}
