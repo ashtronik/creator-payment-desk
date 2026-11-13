@@ -1,8 +1,14 @@
-import { createInvoiceForWallet } from "@/lib/invoice-service";
+import { verifyDeskToken } from "@/lib/db";
+import { createInvoiceForCreator, createInvoiceForWallet } from "@/lib/invoice-service";
 
 const MAX_BODY_BYTES = 10 * 1024;
 
 export async function POST(request: Request) {
+  const hasDeskToken = request.headers.has("x-desk-token");
+  const deskToken = request.headers.get("x-desk-token");
+  const deskAccess = hasDeskToken && deskToken ? verifyDeskToken(deskToken) : null;
+  if (hasDeskToken && !deskAccess) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+
   const contentLength = request.headers.get("content-length");
   if (contentLength && Number(contentLength) > MAX_BODY_BYTES) {
     return Response.json({ errors: { body: "Request body must be 10 KB or smaller" } }, { status: 400 });
@@ -24,6 +30,20 @@ export async function POST(request: Request) {
 
   try {
     const input = body as Record<string, unknown>;
+    if (deskAccess) {
+      const result = createInvoiceForCreator(deskAccess.creatorId, {
+        amountCents: input.amountCents,
+        description: input.description,
+        deliverableUrl: input.deliverableUrl,
+        clientName: input.clientName,
+      });
+      if (result.kind === "invalid") return Response.json({ errors: result.errors }, { status: 400 });
+      const origin = new URL(request.url).origin;
+      return Response.json({
+        invoiceId: result.invoiceId,
+        payUrl: `${origin}/pay/${encodeURIComponent(result.invoiceId)}`,
+      }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    }
     const result = createInvoiceForWallet({
       wallet: input.wallet,
       amountCents: input.amountCents,

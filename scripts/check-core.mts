@@ -6,11 +6,14 @@ import { join } from "node:path";
 const tempDirectory = mkdtempSync(join(tmpdir(), "creator-payment-desk-"));
 process.env.DB_PATH = join(tempDirectory, "check.db");
 
-const { createCreator, createInvoice, findCreatorByAddress, getInvoicePublic, issueDeskToken, listInvoicesForCreator, revokeDeskToken, verifyDeskToken } = await import("../lib/db");
+const { countActiveDeskTokens, createCreator, createInvoice, findCreatorByAddress, getCreatorDesk, getInvoicePublic, issueDeskToken, listInvoicesForCreator, revokeDeskToken, revokeOtherDeskTokens, verifyDeskToken } = await import("../lib/db");
 const { hashToken, timingSafeEqualHex } = await import("../lib/tokens");
 const { validateAmountCents, validateClientName, validateDeliverableUrl, validateDescription, validateNearAddress } = await import("../lib/validate");
-const { createInvoiceForWallet } = await import("../lib/invoice-service");
+const { createInvoiceForCreator, createInvoiceForWallet } = await import("../lib/invoice-service");
 const { createQuoteForInvoice, refreshInvoiceStatus, PaymentInputError } = await import("../lib/payment-service");
+const { POST: createDeskToken } = await import("../app/api/desk/tokens/route");
+const { POST: createInvoiceRoute } = await import("../app/api/invoices/route");
+const { escapeCsvCell } = await import("../app/api/desk/export/route");
 
 try {
   const creatorId = createCreator("alice.near");
@@ -97,6 +100,45 @@ try {
     deliverableUrl: "http://example.com",
   });
   assert.equal(invalidWalletInvoice.kind, "invalid");
+
+  const deskCreatorId = createCreator("desk-owner.near");
+  const deskTokenA = issueDeskToken(deskCreatorId);
+  const deskTokenB = issueDeskToken(deskCreatorId);
+  assert.equal(verifyDeskToken(deskTokenA)?.creatorId, verifyDeskToken(deskTokenB)?.creatorId);
+  const deskInvoice = createInvoiceForCreator(deskCreatorId, Object.assign({
+    amountCents: 3_000,
+    description: "Desk-created invoice",
+    deliverableUrl: "https://example.com/desk-invoice",
+    clientName: "Desk client",
+  }, { wallet: "someone-else.near" }));
+  assert.equal(deskInvoice.kind, "created");
+  assert.equal(listInvoicesForCreator(verifyDeskToken(deskTokenA)!.creatorId)[0]?.id, deskInvoice.kind === "created" ? deskInvoice.invoiceId : "");
+  assert.equal(listInvoicesForCreator(verifyDeskToken(deskTokenB)!.creatorId)[0]?.id, deskInvoice.kind === "created" ? deskInvoice.invoiceId : "");
+  assert.equal(findCreatorByAddress("someone-else.near"), null);
+  assert.equal(getCreatorDesk(deskCreatorId).invoices.length, 1);
+  const walletOnlyResponse = await createInvoiceRoute(new Request("http://localhost/api/invoices", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ wallet: "desk-owner.near", amountCents: 3_000, description: "No access", deliverableUrl: "https://example.com/no-access", clientName: "" }),
+  }));
+  assert.equal(walletOnlyResponse.status, 409);
+  assert.equal(listInvoicesForCreator(deskCreatorId).length, 1);
+
+  const replacementToken = issueDeskToken(deskCreatorId);
+  assert.equal(revokeOtherDeskTokens(deskCreatorId, replacementToken), 2);
+  assert.equal(verifyDeskToken(deskTokenA), null);
+  assert.equal(verifyDeskToken(deskTokenB), null);
+  assert.equal(verifyDeskToken(replacementToken)?.creatorId, deskCreatorId);
+
+  const limitCreatorId = createCreator("limit-owner.near");
+  const limitToken = issueDeskToken(limitCreatorId);
+  for (let index = 1; index < 10; index += 1) issueDeskToken(limitCreatorId);
+  assert.equal(countActiveDeskTokens(limitCreatorId), 10);
+  const limitResponse = await createDeskToken(new Request("http://localhost/api/desk/tokens", {
+    method: "POST", headers: { "content-type": "application/json", "x-desk-token": limitToken }, body: JSON.stringify({ revokeOthers: false }),
+  }));
+  assert.equal(limitResponse.status, 409);
+  assert.equal(escapeCsvCell("=SUM(A1:A2)"), "'=SUM(A1:A2)");
+  assert.equal(escapeCsvCell("+danger"), "'+danger");
+  assert.equal(escapeCsvCell("safe, value"), '"safe, value"');
 
   process.env.DEMO_MODE = "false";
   let calls = 0;

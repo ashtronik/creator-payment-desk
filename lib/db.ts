@@ -351,3 +351,42 @@ export function updateInvoicePaymentStatus(id: string, status: string, txHash: s
   return invoice;
 }
 
+export function revokeOtherDeskTokens(creatorId: number, keepToken: string): number {
+  const result = getDatabase().prepare(`
+    UPDATE desk_tokens SET revoked_at = CURRENT_TIMESTAMP
+    WHERE creator_id = ? AND token_hash != ? AND revoked_at IS NULL
+  `).run(creatorId, hashToken(keepToken));
+  return Number(result.changes ?? 0);
+}
+
+export function countActiveDeskTokens(creatorId: number): number {
+  const row = getDatabase().prepare(`
+    SELECT COUNT(*) AS count FROM desk_tokens WHERE creator_id = ? AND revoked_at IS NULL
+  `).get(creatorId);
+  return Number(row?.count ?? 0);
+}
+
+export type CreatorDesk = {
+  invoices: PublicInvoice[];
+  totals: {
+    paidCents: number;
+    pendingCount: number;
+    pendingCents: number;
+    byStatus: Record<string, number>;
+  };
+};
+
+export function getCreatorDesk(creatorId: number): CreatorDesk {
+  const invoices = listInvoicesForCreator(creatorId);
+  const totals = { paidCents: 0, pendingCount: 0, pendingCents: 0, byStatus: {} as Record<string, number> };
+  for (const invoice of invoices) {
+    totals.byStatus[invoice.status] = (totals.byStatus[invoice.status] ?? 0) + 1;
+    if (invoice.status === "paid") totals.paidCents += invoice.amount_cents;
+    if (invoice.status === "pending" || invoice.status === "awaiting_deposit" || invoice.status === "processing") {
+      totals.pendingCount += 1;
+      totals.pendingCents += invoice.amount_cents;
+    }
+  }
+  return { invoices, totals };
+}
+

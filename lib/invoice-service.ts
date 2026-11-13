@@ -1,4 +1,4 @@
-import { createCreatorWithFirstInvoice } from "./db";
+import { createCreatorWithFirstInvoice, createInvoice } from "./db";
 import { validateAmountCents, validateClientName, validateDeliverableUrl, validateDescription, validateNearAddress } from "./validate";
 
 export type CreateInvoiceForWalletInput = {
@@ -36,4 +36,30 @@ export function createInvoiceForWallet(input: CreateInvoiceForWalletInput): Crea
     deliverableUrl: deliverableUrl.ok ? deliverableUrl.value : "",
     clientName: clientName.ok ? clientName.value : "",
   });
+}
+
+export type CreateInvoiceForCreatorResult =
+  | { kind: "created"; invoiceId: string }
+  | { kind: "invalid"; errors: Record<string, string> };
+
+export function createInvoiceForCreator(creatorId: number, input: Omit<CreateInvoiceForWalletInput, "wallet">): CreateInvoiceForCreatorResult {
+  const amountCents = validateAmountCents(input.amountCents);
+  const description = validateDescription(input.description);
+  const deliverableUrl = validateDeliverableUrl(input.deliverableUrl);
+  const clientName = validateClientName(input.clientName ?? "");
+  const errors: Record<string, string> = {};
+  if (!amountCents.ok) errors.amountCents = amountCents.error;
+  if (!description.ok) errors.description = description.error;
+  if (!deliverableUrl.ok) errors.deliverableUrl = deliverableUrl.error;
+  if (!clientName.ok) errors.clientName = clientName.error;
+  if (Object.keys(errors).length > 0) return { kind: "invalid", errors };
+
+  const invoice = createInvoice({
+    creatorId,
+    amountCents: amountCents.ok ? amountCents.value : 0,
+    description: description.ok ? description.value : "",
+    deliverableUrl: deliverableUrl.ok ? deliverableUrl.value : "",
+    clientName: clientName.ok ? clientName.value : "",
+  });
+  return { kind: "created", invoiceId: invoice.id };
 }
