@@ -2,13 +2,6 @@ import { CreateInvoiceForm } from "./create-invoice-form";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-950 sm:px-6 sm:py-16">
-      <div className="mx-auto w-full max-w-2xl">
-        <p className="text-sm font-semibold tracking-wide text-indigo-700">CREATOR PAYMENT DESK</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Create an invoice</h1>
-        <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">Share a payment link for your work. Your client will see the details and payment options next.</p>
-        <CreateInvoiceForm />
-      </div>
-    </main>
+    <main className="overflow-hidden px-4 py-12 sm:px-6 sm:py-20"><div className="mx-auto grid w-full max-w-[1080px] items-center gap-12 lg:grid-cols-[minmax(0,1fr)_470px] lg:gap-16"><section className="relative"><p className="eyebrow inline-flex rounded-full border border-green/35 bg-green-tint px-3 py-2 text-green">For web3 creators</p><h1 className="display mt-5 max-w-xl text-text">Get paid from <span className="text-green">any chain.</span></h1><p className="mt-5 max-w-lg text-lg leading-8 text-muted">Create one clear payment request, share it with your client, and receive the exact stablecoin amount you earned.</p><ol className="relative mt-10 grid max-w-xl gap-7 sm:grid-cols-3 sm:gap-4">{[["01", "Create invoice"], ["02", "Share the link"], ["03", "Get paid in USDC"]].map(([number, label], index) => <li key={number} className="relative"><span className="mono flex h-9 w-9 items-center justify-center rounded-full border border-green text-xs text-green">{number}</span>{index < 2 ? <span aria-hidden="true" className="absolute left-9 top-4 hidden h-px w-[calc(100%-2.25rem)] bg-green/35 sm:block" /> : null}<p className="mt-3 font-semibold tracking-[-.02em] text-text">{label}</p></li>)}</ol><div aria-hidden="true" className="absolute -bottom-24 -left-24 h-44 w-80 rounded-[100%] border-t border-green/25" /></section><section><p className="eyebrow mb-3 text-muted">New payment request</p><CreateInvoiceForm /></section></div></main>
   );
 }

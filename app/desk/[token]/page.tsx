@@ -25,7 +25,7 @@ export default async function DeskPage({ params }: { params: Promise<{ token: st
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
   const payOrigin = host ? `${protocol}://${host}` : "";
 
-  return <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-950 sm:px-6 sm:py-16"><Suspense fallback={<p className="mx-auto max-w-5xl text-sm text-slate-600">Loading desk…</p>}><DeskDetails creatorId={access.creatorId} deskToken={token} payOrigin={payOrigin} /></Suspense></main>;
+  return <main className="px-4 py-12 sm:px-6 sm:py-16"><Suspense fallback={<p className="mx-auto max-w-[1080px] text-sm text-muted">Loading desk…</p>}><DeskDetails creatorId={access.creatorId} deskToken={token} payOrigin={payOrigin} /></Suspense></main>;
 }
 
 async function DeskDetails({ creatorId, deskToken, payOrigin }: { creatorId: number; deskToken: string; payOrigin: string }) {

@@ -54,27 +54,28 @@ export function CreateInvoiceForm() {
   }
 
   return (
-    <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+    <div className="surface p-5 sm:p-8">
       <form className="space-y-5" onSubmit={submit}>
-        <Field label="Your NEAR wallet" error={errors.wallet}><input value={wallet} onChange={(event) => setWallet(event.target.value)} placeholder="creator.near" autoComplete="off" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" /></Field>
-        <Field label="Amount (USD)" error={errors.amount ?? errors.amountCents}><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="250.00" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" /></Field>
-        <Field label="What did you deliver?" error={errors.description}><textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={500} required rows={4} className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" /></Field>
-        <Field label="Deliverable link" error={errors.deliverableUrl}><input value={deliverableUrl} onChange={(event) => setDeliverableUrl(event.target.value)} type="url" placeholder="https://…" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" /></Field>
-        <Field label="Client name (optional)" error={errors.clientName}><input value={clientName} onChange={(event) => setClientName(event.target.value)} maxLength={100} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100" /></Field>
-        {errors.form ? <p className="text-sm text-red-700">{errors.form}</p> : null}
-        <button type="submit" disabled={submitting} className="w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Creating invoice…" : "Create invoice"}</button>
+        <Field label="Your NEAR wallet" error={errors.wallet} icon="wallet"><input value={wallet} onChange={(event) => setWallet(event.target.value)} placeholder="creator.near" autoComplete="off" required className="control mono pl-12" /></Field>
+        <Field label="Amount (USD)" error={errors.amount ?? errors.amountCents} icon="dollar"><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="250.00" required className="control mono pl-12" /></Field>
+        <Field label="What did you deliver?" error={errors.description} icon="document"><textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={500} required rows={4} className="control min-h-30 resize-y pl-12" /></Field>
+        <Field label="Deliverable link" error={errors.deliverableUrl} icon="link"><input value={deliverableUrl} onChange={(event) => setDeliverableUrl(event.target.value)} type="url" placeholder="https://…" required className="control pl-12" /></Field>
+        <Field label="Client name (optional)" error={errors.clientName} icon="person"><input value={clientName} onChange={(event) => setClientName(event.target.value)} maxLength={100} className="control pl-12" /></Field>
+        {errors.form ? <p className="text-sm text-coral-ink">{errors.form}</p> : null}
+        <button type="submit" disabled={submitting} className="button-primary w-full disabled:opacity-60">{submitting ? <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-black/25 border-t-black" />Creating invoice…</span> : "Create invoice"}</button>
       </form>
-      {deskExists ? <p className="mt-6 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-950">This wallet already has a private desk. Use your desk link to add invoices.</p> : null}
-      {created ? <section className="mt-6 space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-semibold text-emerald-950">Invoice created</p><LinkRow label="Pay link: send this to your client" href={created.payUrl} /><div className="rounded-xl border-2 border-amber-500 bg-amber-100 p-4 text-amber-950"><p className="text-base font-extrabold tracking-wide sm:text-lg">SAVE YOUR DESK LINK NOW!!! IT IS SHOWN ONLY ONCE!</p><p className="mt-2 text-sm leading-6">Anyone with this link can see your payment history. Do not share it.</p></div><LinkRow label="Desk link: PRIVATE, only for you" href={created.deskUrl} /></section> : null}
+      {deskExists ? <p className="mt-6 rounded-xl bg-coral-tint p-4 text-sm leading-6 text-coral-ink">This wallet already has a private desk. Use your desk link to add invoices.</p> : null}
+      {created ? <section className="animate-enter mt-6 space-y-5"><div className="relative flex items-center gap-3 rounded-xl border border-green/35 bg-green-tint p-4"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-green text-lg font-bold text-on-green shadow-[0_0_24px_rgba(0,236,151,.35)]">✓</span><span aria-hidden="true" className="absolute left-11 top-2 text-xs text-green">✦</span><p className="font-semibold text-text">Invoice created</p></div><LinkRow label="Pay link: send this to your client" href={created.payUrl} /><div className="rounded-xl border border-coral/40 border-t-4 border-t-coral bg-danger-bg p-5 text-text shadow-[0_10px_36px_rgba(255,121,102,.16)]"><div className="flex gap-3"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-coral-tint"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 text-coral" fill="none"><path d="m12 3 10 18H2L12 3Z" stroke="currentColor" strokeWidth="2"/><path d="M12 9v5m0 3h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></span><div><p className="text-lg font-extrabold tracking-wide text-[#FFF1EE] sm:text-xl">SAVE YOUR DESK LINK NOW!!! IT IS SHOWN ONLY ONCE!</p><p className="mt-2 text-sm leading-6 text-[#F0D5CF]">Anyone with this link can see your payment history. Do not share it.</p></div></div><LinkRow label="Desk link: PRIVATE, only for you" href={created.deskUrl} dark /></div></section> : null}
     </div>
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
-  return <label className="block text-sm font-medium text-slate-800"><span>{label}</span><span className="mt-2 block">{children}</span>{error ? <span className="mt-1 block text-sm font-normal text-red-700">{error}</span> : null}</label>;
+function Field({ label, error, icon, children }: { label: string; error?: string; icon: "wallet" | "dollar" | "document" | "link" | "person"; children: ReactNode }) {
+  const icons = { wallet: <path d="M4 7h15a1 1 0 0 1 1 1v10H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h13M16 13h.01"/>, dollar: <path d="M12 3v18m4-14.5c0-1.3-1.8-2.5-4-2.5s-4 1.2-4 3 1.8 2.5 4 3 4 1.2 4 3-1.8 3-4 3-4-1.2-4-2.5"/>, document: <path d="M6 3h8l4 4v14H6V3Zm8 0v5h5M9 13h6m-6 4h6"/>, link: <path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/>, person: <path d="M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/> };
+  return <label className="block text-sm font-medium text-text"><span>{label}</span><span className="relative mt-2 block"><svg aria-hidden="true" viewBox="0 0 24 24" className="absolute left-3 top-3 h-5 w-5 text-muted" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{icons[icon]}</svg>{children}</span>{error ? <span className="mt-1 block text-sm font-normal text-coral-ink">{error}</span> : null}</label>;
 }
 
-function LinkRow({ label, href }: { label: string; href: string }) {
+function LinkRow({ label, href, dark = false }: { label: string; href: string; dark?: boolean }) {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const linkRef = useRef<HTMLAnchorElement>(null);
 
@@ -97,10 +98,10 @@ function LinkRow({ label, href }: { label: string; href: string }) {
 
   const buttonLabel = copyStatus === "copied" ? "Copied ✓" : copyStatus === "failed" ? "Press Cmd+C" : "Copy";
   const buttonClass = copyStatus === "copied"
-    ? "scale-105 border-emerald-500 bg-emerald-100 text-emerald-800"
+    ? "scale-105 border-green bg-green text-ink"
     : copyStatus === "failed"
-      ? "border-amber-500 bg-amber-100 text-amber-900"
-      : "border-emerald-300 bg-white text-emerald-950";
+      ? "border-coral bg-coral-tint text-coral-ink"
+      : "border-green bg-green text-ink";
 
-  return <div><p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">{label}</p><div className="mt-1 flex gap-2"><a ref={linkRef} href={href} className="min-w-0 flex-1 truncate rounded-lg bg-white px-3 py-2 text-sm text-indigo-800 underline" target="_blank" rel="noopener noreferrer">{href}</a><button type="button" onClick={() => void copyLink()} className={`rounded-lg border px-3 py-2 text-sm font-medium transition duration-150 motion-reduce:transition-none ${buttonClass}`}>{buttonLabel}</button></div><span className="sr-only" aria-live="polite">{copyStatus === "idle" ? "" : buttonLabel}</span></div>;
+  return <div><p className={`eyebrow ${dark ? "text-[#F0D5CF]" : "text-green"}`}>{label}</p><div className="mt-2 flex gap-2"><a ref={linkRef} href={href} className={`mono min-w-0 flex-1 truncate rounded-xl px-3 py-3 text-sm underline ${dark ? "dark-field text-text" : "border border-green/25 bg-green-tint text-text"}`} target="_blank" rel="noopener noreferrer">{href}</a><button type="button" onClick={() => void copyLink()} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-medium motion-reduce:transition-none ${buttonClass}`}>{copyStatus === "idle" ? <span className="inline-flex items-center gap-1.5"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none"><rect x="8" y="8" width="11" height="11" rx="1" stroke="currentColor" strokeWidth="2"/><path d="M5 16V5a1 1 0 0 1 1-1h11" stroke="currentColor" strokeWidth="2"/></svg>Copy</span> : buttonLabel}</button></div><span className="sr-only" aria-live="polite">{copyStatus === "idle" ? "" : buttonLabel}</span></div>;
 }
