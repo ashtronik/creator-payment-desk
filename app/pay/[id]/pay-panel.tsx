@@ -152,7 +152,13 @@ function Countdown({ deadline }: { deadline: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1_000); return () => window.clearInterval(timer); }, []);
   const seconds = Math.max(0, Math.ceil((Date.parse(deadline) - now) / 1_000));
-  const text = seconds === 0 ? "Payment window expired" : `Payment window: ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} remaining`;
+  const text = seconds === 0
+    ? "Payment window expired"
+    : seconds >= 86_400
+      ? `Payment window: ${Math.floor(seconds / 86_400)}d ${Math.floor((seconds % 86_400) / 3_600)}h remaining`
+      : seconds >= 3_600
+        ? `Payment window: ${Math.floor(seconds / 3_600)}h ${Math.floor((seconds % 3_600) / 60)}m remaining`
+        : `Payment window: ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} remaining`;
   return <p className="mono mt-5 text-sm font-medium text-muted" aria-live="polite">{text}</p>;
 }
 
