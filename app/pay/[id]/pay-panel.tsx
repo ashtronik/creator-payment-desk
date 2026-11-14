@@ -133,10 +133,14 @@ function PaymentInstructions({ state }: { state: PaymentStatus }) {
 }
 
 function PaidPanel({ state }: { state: PaymentStatus }) {
-  const url = state.receipt?.destinationTxUrl;
-  const safeReceipt = typeof url === "string" && url.startsWith("https://");
+  const receipt = state.receipt?.destinationTxUrl;
+  const receiptUrl = typeof receipt === "string" && receipt.startsWith("https://")
+    ? receipt
+    : typeof receipt === "string" && /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(receipt)
+      ? `https://nearblocks.io/txns/${receipt}`
+      : null;
   const amount = state.payment ? (state.payment.sendAmount.trim().endsWith(state.payment.symbol) ? state.payment.sendAmount : `${state.payment.sendAmount} ${state.payment.symbol}`) : null;
-  return <Panel><div className="flex justify-end"><StatusBadge status="paid" /></div><DemoBanner demo={state.demo} /><div className="rounded-2xl bg-green-tint p-6 text-center"><span className="mx-auto flex h-15 w-15 items-center justify-center rounded-full bg-green text-on-green"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8" fill="none"><path d="m5 12 4 4L19 6" className="draw-check" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></span><p className="mt-4 text-3xl font-bold text-text" aria-live="polite">Paid ✓</p>{amount ? <p className="mono mt-2 font-semibold text-green">{amount}</p> : null}{safeReceipt ? <a href={url} target="_blank" rel="noopener noreferrer nofollow" className="button-outline mt-5 inline-flex text-base">View receipt</a> : null}</div><Progress status="paid" /></Panel>;
+  return <Panel><div className="flex justify-end"><StatusBadge status="paid" /></div><DemoBanner demo={state.demo} /><div className="rounded-2xl bg-green-tint p-6 text-center"><span className="mx-auto flex h-15 w-15 items-center justify-center rounded-full bg-green text-on-green"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8" fill="none"><path d="m5 12 4 4L19 6" className="draw-check" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></span><p className="mt-4 text-3xl font-bold text-text" aria-live="polite">Paid ✓</p>{amount ? <p className="mono mt-2 font-semibold text-green">{amount}</p> : null}{receiptUrl ? <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="button-outline mt-5 inline-flex text-base">View receipt</a> : null}</div><Progress status="paid" /></Panel>;
 }
 
 function Progress({ status }: { status: PaymentStatus["status"] }) {
