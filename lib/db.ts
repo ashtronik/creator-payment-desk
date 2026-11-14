@@ -7,9 +7,9 @@ import { generateToken, hashToken, timingSafeEqualHex } from "./tokens";
 import {
   validateAmountCents,
   validateClientName,
-  validateDeliverableUrl,
   validateDescription,
   validateNearAddress,
+  normalizeDeliverableUrl,
 } from "./validate";
 
 type SqliteRow = Record<string, unknown>;
@@ -54,7 +54,7 @@ export type CreateInvoiceInput = {
   creatorId: number;
   amountCents: number;
   description: string;
-  deliverableUrl: string;
+  deliverableUrl: unknown;
   clientName: string;
   status?: string;
   depositAddress?: string | null;
@@ -126,7 +126,7 @@ function rowToPublicInvoice(row: SqliteRow): PublicInvoice {
     id: String(row.id),
     amount_cents: Number(row.amount_cents),
     description: String(row.description),
-    deliverable_url: String(row.deliverable_url),
+    deliverable_url: typeof row.deliverable_url === "string" ? row.deliverable_url : "",
     client_name: String(row.client_name),
     status: String(row.status),
     deposit_address: row.deposit_address == null ? null : String(row.deposit_address),
@@ -198,7 +198,7 @@ export function revokeDeskToken(token: string): boolean {
 export function createInvoice(input: CreateInvoiceInput): PublicInvoice {
   const amount = validateAmountCents(input.amountCents);
   const description = validateDescription(input.description);
-  const deliverableUrl = validateDeliverableUrl(input.deliverableUrl);
+  const deliverableUrl = normalizeDeliverableUrl(input.deliverableUrl);
   const clientName = validateClientName(input.clientName);
   if (!amount.ok) throw new Error(amount.error);
   if (!description.ok) throw new Error(description.error);
@@ -254,10 +254,12 @@ export function createCreatorWithFirstInvoice(input: {
   nearAddress: string;
   amountCents: number;
   description: string;
-  deliverableUrl: string;
+  deliverableUrl: unknown;
   clientName: string;
 }): { kind: "created"; invoiceId: string; deskToken: string } | { kind: "desk_exists" } {
   const database = getDatabase();
+  const deliverableUrl = normalizeDeliverableUrl(input.deliverableUrl);
+  if (!deliverableUrl.ok) throw new Error(deliverableUrl.error);
   let transactionOpen = false;
 
   try {
@@ -272,7 +274,7 @@ export function createCreatorWithFirstInvoice(input: {
     database.prepare(`
       INSERT INTO invoices (id, creator_id, amount_cents, description, deliverable_url, client_name)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(invoiceId, creatorId, input.amountCents, input.description, input.deliverableUrl, input.clientName);
+    `).run(invoiceId, creatorId, input.amountCents, input.description, deliverableUrl.value, input.clientName);
 
     database.exec("COMMIT");
     transactionOpen = false;

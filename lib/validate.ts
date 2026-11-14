@@ -38,24 +38,42 @@ export function validateAmountCents(value: unknown): ValidationResult<number> {
   return { ok: true, value };
 }
 
-export function validateDeliverableUrl(value: unknown): ValidationResult<string> {
-  const result = stringResult(value, "deliverable url", 2_000);
-  if (!result.ok) return result;
+const deliverableUrlError = "Enter a link like example.com";
 
-  try {
-    const url = new URL(result.value);
-    if (url.protocol !== "https:") {
-      return { ok: false, error: "deliverable url must use https" };
-    }
-    if (url.username || url.password) {
-      return { ok: false, error: "deliverable url must not contain credentials" };
-    }
-  } catch {
-    return { ok: false, error: "deliverable url must be a valid https URL" };
+export function normalizeDeliverableUrl(value: unknown): ValidationResult<string> {
+  if (value == null) return { ok: true, value: "" };
+  if (typeof value !== "string") return { ok: false, error: deliverableUrlError };
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: true, value: "" };
+  if (trimmed.length > 2_000 || /\s/.test(trimmed)) {
+    return { ok: false, error: deliverableUrlError };
   }
 
-  return result;
+  let normalized = trimmed;
+  if (!/^https?:\/\//i.test(normalized)) {
+    if (/^[A-Za-z0-9+.-]+:(?!\d)/.test(normalized)) {
+      return { ok: false, error: deliverableUrlError };
+    }
+    normalized = `https://${normalized}`;
+  }
+
+  try {
+    const url = new URL(normalized);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return { ok: false, error: deliverableUrlError };
+    }
+    if (!url.hostname.includes(".") || url.username || url.password) {
+      return { ok: false, error: deliverableUrlError };
+    }
+  } catch {
+    return { ok: false, error: deliverableUrlError };
+  }
+
+  return { ok: true, value: normalized };
 }
+
+export const validateDeliverableUrl = normalizeDeliverableUrl;
 
 export function validateDescription(value: unknown): ValidationResult<string> {
   const result = stringResult(value, "description", 500);

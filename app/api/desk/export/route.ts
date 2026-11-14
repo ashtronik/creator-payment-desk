@@ -20,9 +20,9 @@ export async function GET(request: Request) {
     if (!attempt.ok) return Response.json({ error: "RATE_LIMITED" }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(attempt.retryAfterSeconds) } });
     return Response.json({ error: "NOT_FOUND" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
-  const header = ["invoice_id", "created_at", "description", "client_name", "amount_usd", "status", "paid_at", "tx_hash"];
+  const header = ["invoice_id", "created_at", "description", "deliverable_url", "client_name", "amount_usd", "status", "paid_at", "tx_hash"];
   const rows = listInvoicesForCreator(access.creatorId).map((invoice) => [
-    invoice.id, invoice.created_at, invoice.description, invoice.client_name, formatUsd(invoice.amount_cents), invoice.status, invoice.paid_at ?? "", invoice.tx_hash ?? "",
+    invoice.id, invoice.created_at, invoice.description, invoice.deliverable_url ?? "", invoice.client_name, formatUsd(invoice.amount_cents), invoice.status, invoice.paid_at ?? "", invoice.tx_hash ?? "",
   ].map((value) => escapeCsvCell(value)).join(","));
   return new Response([header.join(","), ...rows].join("\r\n"), {
     headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="invoices.csv"', "Cache-Control": "no-store" },

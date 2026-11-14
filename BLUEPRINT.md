@@ -57,6 +57,8 @@ B. Valid desk token: add invoice to that creator. The wallet
    comes from the creator record, not the form.
 C. Wallet exists, no valid token: reject (409). Nothing
    created, no token issued.
+The deliverable link is optional. Links without http(s)://
+get https:// added before storage.
 Another link: generated from inside the desk (needs a valid
 token). Lost every link: wallet-signature recovery
 (STRETCH, recovery only, never normal access).
@@ -73,7 +75,6 @@ POST /api/invoices        flows A, B, C
 GET  /api/invoices/[id]   public pay-page data only
 POST /api/quote           recipient from DB
 GET  /api/status          poll payment
-GET  /api/desk            full history + totals (token)
 GET  /api/desk/export     CSV (token)
 POST /api/desk/tokens     new link; option to revoke others
 
@@ -84,7 +85,7 @@ Old links keep working unless revoked.
 
 ## Security
 - A wallet address alone never grants access to anything.
-- Invalid, revoked or unknown token: same generic 404.
+- Invalid, revoked or unknown token: same generic not-found page.
 - Desk pages: Referrer-Policy no-referrer, no-store, noindex.
 - Public invoice data never includes creator_id or tokens.
 - Rate-limit token attempts and invoice creation.

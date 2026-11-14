@@ -2,6 +2,7 @@ import { verifyDeskToken } from "@/lib/db";
 import { createInvoiceForCreator, createInvoiceForWallet } from "@/lib/invoice-service";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { hashToken } from "@/lib/tokens";
+import { normalizeDeliverableUrl } from "@/lib/validate";
 
 const MAX_BODY_BYTES = 10 * 1024;
 const hour = 60 * 60_000;
@@ -46,11 +47,13 @@ export async function POST(request: Request) {
 
   try {
     const input = body as Record<string, unknown>;
+    const deliverableUrl = normalizeDeliverableUrl(input.deliverableUrl);
+    if (!deliverableUrl.ok) return Response.json({ errors: { deliverableUrl: deliverableUrl.error } }, { status: 400 });
     if (deskAccess) {
       const result = createInvoiceForCreator(deskAccess.creatorId, {
         amountCents: input.amountCents,
         description: input.description,
-        deliverableUrl: input.deliverableUrl,
+        deliverableUrl: deliverableUrl.value,
         clientName: input.clientName,
       });
       if (result.kind === "invalid") return Response.json({ errors: result.errors }, { status: 400 });
@@ -64,7 +67,7 @@ export async function POST(request: Request) {
       wallet: input.wallet,
       amountCents: input.amountCents,
       description: input.description,
-      deliverableUrl: input.deliverableUrl,
+      deliverableUrl: deliverableUrl.value,
       clientName: input.clientName,
     });
     if (result.kind === "invalid") return Response.json({ errors: result.errors }, { status: 400 });

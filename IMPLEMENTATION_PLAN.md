@@ -28,7 +28,7 @@ Cut NICE first. Never cut README or demo.
 ## PHASE 2: Creators + invoices (Nov 12) — feat/invoices
 - [ ] Database set up with 3 tables (creators, desk_tokens, invoices)
 - [ ] Token helpers: generate, hash, verify
-- [ ] Input checks: NEAR address, amount, https link, lengths
+- [ ] Input checks: NEAR address, amount, optional deliverable link, bare domains accepted, lengths
 - [ ] POST /api/invoices: flow A (new wallet) and flow C (blocked)
 - [ ] Create-invoice form
 - [ ] Desk link shown ONCE with a save-this warning
@@ -49,7 +49,7 @@ Cut NICE first. Never cut README or demo.
 - [ ] Lint and build pass; commit, push, merge
 
 ## PHASE 4: Private desk (Nov 13) — feat/desk
-- [ ] /desk/[token] works; bad or revoked token gives a generic 404
+- [ ] /desk/[token] works; bad or revoked token gives a generic not-found page
 - [ ] Desk shows ALL the creator's invoices + totals
 - [ ] New invoice inside the desk (flow B, no wallet field)
 - [ ] Generate a new access link; option to revoke the others
